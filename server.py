@@ -1,8 +1,9 @@
-from flask import Flask, jsonify, request, abort, send_file
-from PIL import Image 
+from flask import Flask, Response, jsonify, request, abort, send_file, stream_with_context
+from PIL import Image
 import requests
 import yt_dlp
 import cv2
+import subprocess
 import glob
 import os
 import time
@@ -70,14 +71,41 @@ def routeSynth():
     if request.method == 'GET': 
         data = request.args["text"]
 
-        if data.startswith("audio_"):
+        if data.startswith("audio_start_"):
+            audio_req = data.replace("audio_start_", "").split("_", 1)
+            audio_start_time = float(audio_req[0])
+            video_id = audio_req[1]
+
+            file = f"{DOWNLOADS_DIR}/{video_id}_audio.mp3"
+            if not os.path.isfile(file):
+                abort(404)
+
+            process = subprocess.Popen(
+                ["ffmpeg", "-ss", str(audio_start_time), "-i", file, "-acodec", "copy", "-f", "mp3", "-"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
+
+            def generate():
+                while True:
+                    data = process.stdout.read(4096)
+                    if not data:
+                        break
+                    yield data
+
+            return Response(
+                stream_with_context(generate()),
+                mimetype="audio/mpeg"
+            )
+        elif data.startswith("audio_"):
             video_id = data.replace("audio_", "")
 
-            if not os.path.isfile(f"{DOWNLOADS_DIR}/{video_id}_audio.mp3"):
+            file = f"{DOWNLOADS_DIR}/{video_id}_audio.mp3"
+            if not os.path.isfile(file):
                 abort(404)
 
             return send_file(
-                f"{DOWNLOADS_DIR}/{video_id}_audio.mp3",
+                file,
                 mimetype="audio/mpeg",
                 as_attachment=False
             )
@@ -127,7 +155,7 @@ def extract_frame_rgb_pixels(video_id, start_frame=0):
     vid = cv2.VideoCapture(f"{DOWNLOADS_DIR}/{video_id}_video.mp4")
 
     fps = round(vid.get(cv2.CAP_PROP_FPS))
-    duration = round(int(vid.get(cv2.CAP_PROP_FRAME_COUNT)) / fps)
+    duration = int(vid.get(cv2.CAP_PROP_FRAME_COUNT)) / fps
     fps_step = round(fps / VIDEO_TARGET_FPS)
 
     end_frame = start_frame + VIDEO_FRAMES_IN_RESPONSE - 1
