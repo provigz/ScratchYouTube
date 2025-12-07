@@ -6,7 +6,7 @@ This project makes it possible to play YouTube videos in vanilla Scratch, which:
 * are in 54p quality;
 * run at around 6FPS.
 
-<video src="docs/vid/README_PreviewScratchYT.mp4"></video>
+https://github.com/user-attachments/assets/8ffd3e49-2cf6-4d33-a875-11f966e1da3a
 
 ## Explanation on Scratch HTTP GET requests
 
