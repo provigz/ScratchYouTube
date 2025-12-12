@@ -35,10 +35,21 @@ Limitations:
 * Only 5 minutes of video are allowed. This is done as to not flood the Scratch client's memory with frame data.
 * Audio may not be exactly synced to the video, as we have no way of checking when it has been fetched - all of that is done internally through the "Say" block.
 
+## Requirements (for Python server)
+
+Install all dependencies, listed in "requirements.txt":
+
+```
+pip install -r requirements.txt
+```
+
+Ensure you have `ffmpeg` installed on your system.
+On Windows, make sure its location is added to the `PATH` environment variable, so it's accessible from anywhere on the system.
+
 ## How to run?
 
 1. Clone or download the contents of this repository as an archive.
-2. Ensure you have Python and `pip` installed, as well as all required Python libraries *(TODO: Document that!)*. Run `server.py` afterwards.
+2. Ensure you have Python and `pip` installed. Install [all required libraries](#requirements-for-python-server) and run `server.py` afterwards.
 3. Install the Tampermonkey extension in your browser and create a new userscript, where you paste in the contents of `scratch_userscript.user.js`.
 Alternatively, run the code found in `scratch_userscript.user.js` inside the JS console at the Scratch editor.
 4. Import `scratch_project.json` into the Scratch editor and press the green flag.

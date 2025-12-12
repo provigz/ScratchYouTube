@@ -4,7 +4,7 @@
 // @version      2025-12-05
 // @description  try to take over the world!
 // @author       provigz
-// @match        https://scratch.mit.edu/projects/editor/*
+// @match        https://scratch.mit.edu/projects/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=scratch.mit.edu
 // @run-at       document-start
 // @grant        unsafeWindow

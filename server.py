@@ -2,8 +2,8 @@ from flask import Flask, Response, jsonify, request, abort, send_file, stream_wi
 from PIL import Image
 import requests
 import yt_dlp
+import ffmpeg
 import cv2
-import subprocess
 import glob
 import os
 import time
@@ -80,18 +80,21 @@ def routeSynth():
             if not os.path.isfile(file):
                 abort(404)
 
-            process = subprocess.Popen(
-                ["ffmpeg", "-ss", str(audio_start_time), "-i", file, "-acodec", "copy", "-f", "mp3", "-"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL
-            )
-
             def generate():
+                process = (
+                    ffmpeg
+                    .input(file, ss=audio_start_time)
+                    .output('pipe:', format='mp3', acodec='copy')
+                    .run_async(pipe_stdout=True, pipe_stderr=True)
+                )
+
                 while True:
                     data = process.stdout.read(4096)
                     if not data:
                         break
                     yield data
+
+                process.wait()
 
             return Response(
                 stream_with_context(generate()),
