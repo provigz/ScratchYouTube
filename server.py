@@ -30,11 +30,13 @@ def addCorsHeaders(response):
 def routeTranslate(): 
     if request.method == 'GET': 
         data = request.args["text"]
+        if data.startswith("HTTP "):
+            data = data[5:]
 
         if data == "try":
             return jsonify({ "result": "success" })
         elif data.startswith("vid_start_"):
-            video_req = data.replace("vid_start_", "").split("_", 1)
+            video_req = data[10:].split("_", 1)
             video_start_frame = int(video_req[0])
             video_id = video_req[1]
             if not os.path.isfile(f"{DOWNLOADS_DIR}/{video_id}_video.mp4"):
@@ -45,7 +47,7 @@ def routeTranslate():
                 return jsonify({ "result": "end" })
             return jsonify({ "result": f"{frame_count},{frames}" })
         elif data.startswith("vid_prep_"):
-            video_id = data.replace("vid_prep_", "")
+            video_id = data[9:]
             #video_info = download_video(video_id)
             download_video(video_id)
 
@@ -54,7 +56,7 @@ def routeTranslate():
                 return jsonify({ "result": "end" })
             return jsonify({ "result": f"{width},{VIDEO_HEIGHT},{duration},{fps},{fps_step},{frame_count},{frames}" })
         elif data.startswith("vid_"):
-            video_id = data.replace("vid_", "")
+            video_id = data[4:]
             if video_id in active_video_downloads:
                 return jsonify({ "result": "processing" })
             elif not os.path.isfile(f"{DOWNLOADS_DIR}/{video_id}_video.mp4"):
@@ -70,9 +72,11 @@ def routeTranslate():
 def routeSynth(): 
     if request.method == 'GET': 
         data = request.args["text"]
+        if data.startswith("HTTP "):
+            data = data[5:]
 
         if data.startswith("audio_start_"):
-            audio_req = data.replace("audio_start_", "").split("_", 1)
+            audio_req = data[12:].split("_", 1)
             audio_start_time = float(audio_req[0])
             video_id = audio_req[1]
 
@@ -101,7 +105,7 @@ def routeSynth():
                 mimetype="audio/mpeg"
             )
         elif data.startswith("audio_"):
-            video_id = data.replace("audio_", "")
+            video_id = data[6:]
 
             file = f"{DOWNLOADS_DIR}/{video_id}_audio.mp3"
             if not os.path.isfile(file):
