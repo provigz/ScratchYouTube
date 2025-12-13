@@ -1,9 +1,9 @@
 from flask import Flask, Response, jsonify, request, abort, send_file, stream_with_context
-from PIL import Image
+#from PIL import Image
+from fractions import Fraction
 import requests
 import yt_dlp
 import ffmpeg
-import cv2
 import glob
 import os
 import time
@@ -69,7 +69,7 @@ def routeTranslate():
         abort(404)
 
 @app.route('/synth', methods=['GET'])
-def routeSynth(): 
+def routeSynth():
     if request.method == 'GET': 
         data = request.args["text"]
         if data.startswith("HTTP "):
@@ -88,7 +88,11 @@ def routeSynth():
                 process = (
                     ffmpeg
                     .input(file, ss=audio_start_time)
-                    .output('pipe:', format='mp3', acodec='copy')
+                    .output(
+                        'pipe:',
+                        format='mp3',
+                        acodec='copy'
+                    )
                     .run_async(pipe_stdout=True, pipe_stderr=True)
                 )
 
@@ -159,50 +163,51 @@ def download_video(video_id):
     #return info
 
 def extract_frame_rgb_pixels(video_id, start_frame=0):
-    vid = cv2.VideoCapture(f"{DOWNLOADS_DIR}/{video_id}_video.mp4")
+    video_path = f"{DOWNLOADS_DIR}/{video_id}_video.mp4"
 
-    fps = round(vid.get(cv2.CAP_PROP_FPS))
-    duration = int(vid.get(cv2.CAP_PROP_FRAME_COUNT)) / fps
+    probe = ffmpeg.probe(video_path)
+    stream = next(s for s in probe['streams'] if s['codec_type'] == 'video')
+
+    fps = round(Fraction(stream['avg_frame_rate']))
+    duration = int(float(stream.get('duration') or probe['format']['duration']))
     fps_step = round(fps / VIDEO_TARGET_FPS)
 
-    end_frame = start_frame + VIDEO_FRAMES_IN_RESPONSE - 1
+    width = (int(stream['width']) * VIDEO_HEIGHT) // int(stream['height'])
+    frame_size = width * VIDEO_HEIGHT * 3 # RGB24 format
 
-    width = 0
-    frame_id = 0
+    process = (
+        ffmpeg
+        .input(video_path, ss=start_frame * fps_step / fps)
+        .filter('select', f'not(mod(n,{fps_step}))')
+        .filter('scale', width, VIDEO_HEIGHT)
+        .output(
+            'pipe:',
+            format='rawvideo',
+            pix_fmt='rgb24',
+            vsync='vfr',
+            vframes=VIDEO_FRAMES_IN_RESPONSE
+        )
+        .run_async(pipe_stdout=True, pipe_stderr=True)
+    )
+
+    frame_idx = 0
     all_frame_pixels = ""
-
-    count = 0
     while True:
-        success, frame = vid.read()
-        if not success:
+        frame_raw = process.stdout.read(frame_size)
+        if len(frame_raw) < frame_size:
             break
 
-        if count % fps_step == 0:
-            if frame_id < start_frame:
-                frame_id += 1
-            elif frame_id > end_frame:
-                break
-            else:
-                if width == 0:
-                    width = get_width(frame)
+        pixels = memoryview(frame_raw)
+        hex_pixels = [
+            f"{pixels[i]:02X}{pixels[i+1]:02X}{pixels[i+2]:02X}"
+            for i in range(0, frame_size, 3)
+        ]
+        all_frame_pixels += "".join(hex_pixels)
 
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame = cv2.resize(frame, (width, VIDEO_HEIGHT))
+        frame_idx += 1
 
-                pixels = frame.reshape(-1, 3)
-                hex_pixels = [f"{r:02X}{g:02X}{b:02X}" for r, g, b in pixels]
-                all_frame_pixels += "".join(hex_pixels)
-
-                frame_id += 1
-
-        count += 1
-
-    vid.release()
-    return all_frame_pixels, frame_id - start_frame, width, duration, fps, fps_step
-
-def get_width(frame):
-    h, w = frame.shape[:2]
-    return round(w / h * VIDEO_HEIGHT)
+    process.wait()
+    return all_frame_pixels, frame_idx, width, duration, fps, fps_step
 
 
 if __name__ == '__main__': 

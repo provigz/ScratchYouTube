@@ -43,7 +43,7 @@ Install all dependencies, listed in "requirements.txt":
 pip install -r requirements.txt
 ```
 
-Ensure you have [FFmpeg](https://www.ffmpeg.org/download.html) installed on your system.
+Ensure you have [FFmpeg](https://www.ffmpeg.org/download.html) (with FFprobe) installed on your system.
 On Windows, make sure its location is added to the `PATH` environment variable, so it's accessible from anywhere on the system.
 
 ## How to run?
