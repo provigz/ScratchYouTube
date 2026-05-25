@@ -16,18 +16,18 @@ const targetHost = "http://localhost";
     'use strict';
 
     const originalFetch = unsafeWindow.fetch;
-    unsafeWindow.fetch = async function(url, options) {
-        if (typeof url === "string") {
-            const text = (new URLSearchParams(url)).get("text")
+    unsafeWindow.fetch = async function(req, options) {
+        if (typeof req.url === "string") {
+            const text = (new URLSearchParams(req.url)).get("text")
             if (text.startsWith("HTTP ")) {
-                if (url.startsWith("https://translate-service.scratch.mit.edu/translate")) {
+                if (req.url.startsWith("https://translate-service.scratch.mit.edu/translate")) {
                     return originalFetch(`${targetHost}/translate?text=${text.substring(5)}`, options);
-                } else if (url.startsWith("https://synthesis-service.scratch.mit.edu/synth")) {
+                } else if (req.url.startsWith("https://synthesis-service.scratch.mit.edu/synth")) {
                     return originalFetch(`${targetHost}/synth?text=${text.substring(5)}`, options);
                 }
             }
         }
-        return originalFetch(url, options);
+        return originalFetch(req, options);
     };
 
 })();
