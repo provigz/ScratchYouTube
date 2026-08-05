@@ -46,26 +46,46 @@ def routeTranslate():
             if frames == "":
                 return jsonify({ "result": "end" })
             return jsonify({ "result": f"{frame_count},{frames}" })
-        elif data.startswith("vid_prep_"):
-            video_id = data[9:]
-            #video_info = download_video(video_id)
-            download_video(video_id)
-
-            frames, frame_count, width, duration, fps, fps_step = extract_frame_rgb_pixels(video_id)
-            if frames == "":
-                return jsonify({ "result": "end" })
-            return jsonify({ "result": f"{width},{VIDEO_HEIGHT},{duration},{fps},{fps_step},{frame_count},{frames}" })
         elif data.startswith("vid_"):
             video_id = data[4:]
             if video_id in active_video_downloads:
                 return jsonify({ "result": "processing" })
-            elif not os.path.isfile(f"{DOWNLOADS_DIR}/{video_id}_video.mp4"):
-                abort(404)
+            download_video(video_id)
+
+            video_info = extract_video_info(video_id)
+            if video_info:
+                video_title = video_info.get("title", "")
+                video_channel_name = video_info.get("uploader", "")
+
+                video_view_count = video_info.get("view_count")
+                if video_view_count is None:
+                    video_formatted_view_count = "N/A"
+                elif video_view_count >= 1_000_000_000:
+                    video_formatted_view_count = f"{video_view_count / 1_000_000_000:.1f}B"
+                elif video_view_count >= 1_000_000:
+                    video_formatted_view_count = f"{video_view_count / 1_000_000:.1f}M"
+                elif video_view_count >= 1_000:
+                    video_formatted_view_count = f"{video_view_count / 1_000:.1f}K"
+                else:
+                    video_formatted_view_count = str(video_view_count)
+
+                video_likes = video_info.get("like_count")
+                if video_likes is None:
+                    video_formatted_likes = "N/A"
+                elif video_likes >= 1_000_000:
+                    video_formatted_likes = f"{video_likes / 1_000_000:.1f}M"
+                elif video_likes >= 1_000:
+                    video_formatted_likes = f"{video_likes / 1_000:.1f}K"
+                else:
+                    video_formatted_likes = str(video_likes)
+
+                video_upload_date = video_info.get("upload_date", "00000000")
+                video_formatted_upload_date = f"{video_upload_date[:4]}-{video_upload_date[4:6]}-{video_upload_date[6:]}" if len(video_upload_date) == 8 else ""
 
             frames, frame_count, width, duration, fps, fps_step = extract_frame_rgb_pixels(video_id)
             if frames == "":
                 return jsonify({ "result": "end" })
-            return jsonify({ "result": f"{width},{VIDEO_HEIGHT},{duration},{fps},{fps_step},{frame_count},{frames}" })
+            return jsonify({ "result": f"{width},{VIDEO_HEIGHT},{duration},{fps},{fps_step},{video_title},{video_channel_name},{video_formatted_view_count},{video_formatted_likes},{video_formatted_upload_date},{frame_count},{frames}" })
         abort(404)
 
 @app.route('/synth', methods=['GET'])
@@ -123,6 +143,15 @@ def routeSynth():
         abort(404)
 
 
+def extract_video_info(video_id):
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True}) as meta:
+            info = meta.extract_info(video_id, download=False)
+    except Exception as e:
+        print(f"Error fetching metadata for video \"{video_id}\": {e}")
+
+    return info
+
 def download_video(video_id):
     video_opts = {
         "download_sections": {"*": f"0:00-{VIDEO_MINUTE_LIMIT}:00"},
@@ -147,8 +176,6 @@ def download_video(video_id):
         "quiet": True,
     }
 
-    #with yt_dlp.YoutubeDL({"quiet": True}) as meta:
-        #info = meta.extract_info(video_id, download=False)
     active_video_downloads.add(video_id)
     try:
         if not os.path.isfile(f"{DOWNLOADS_DIR}/{video_id}_video.mp4"):
@@ -159,8 +186,6 @@ def download_video(video_id):
                 ydl.download([video_id])
     finally:
         active_video_downloads.remove(video_id)
-
-    #return info
 
 def extract_frame_rgb_pixels(video_id, start_frame=0):
     video_path = f"{DOWNLOADS_DIR}/{video_id}_video.mp4"
