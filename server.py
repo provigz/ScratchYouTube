@@ -40,7 +40,7 @@ def routeTranslate():
             video_start_frame = int(video_req[0])
             video_id = video_req[1]
             if not os.path.isfile(f"{DOWNLOADS_DIR}/{video_id}_video.mp4"):
-                abort(404)
+                return jsonify({ "result": "error" })
 
             frames, frame_count, width, duration, fps, fps_step = extract_frame_rgb_pixels(video_id, video_start_frame - 1)
             if frames == "":
