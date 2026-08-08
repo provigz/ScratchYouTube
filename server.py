@@ -1,6 +1,7 @@
 from flask import Flask, Response, jsonify, request, abort, send_file, stream_with_context
-#from PIL import Image
+from PIL import Image
 from fractions import Fraction
+import io
 import requests
 import yt_dlp
 import ffmpeg
@@ -13,6 +14,8 @@ app = Flask(__name__)
 active_video_downloads = set()
 
 DOWNLOADS_DIR = "dl"
+DELIMITER = "‡"
+THUMBNAIL_HEIGHT = 180
 VIDEO_HEIGHT = 54
 VIDEO_MINUTE_LIMIT = 5
 VIDEO_TARGET_FPS = 6
@@ -42,10 +45,10 @@ def routeTranslate():
             if not os.path.isfile(f"{DOWNLOADS_DIR}/{video_id}_video.mp4"):
                 return jsonify({ "result": "error" })
 
-            frames, frame_count, width, duration, fps, fps_step = extract_frame_rgb_pixels(video_id, video_start_frame - 1)
+            frames, frame_count, width, duration, fps, fps_step = extract_frame_hex_pixels(video_id, video_start_frame - 1)
             if frames == "":
                 return jsonify({ "result": "end" })
-            return jsonify({ "result": f"{frame_count},{frames}" })
+            return jsonify({ "result": f"{frame_count}{DELIMITER}{frames}" })
         elif data.startswith("vid_"):
             video_id = data[4:]
             if video_id in active_video_downloads:
@@ -56,37 +59,36 @@ def routeTranslate():
             if video_info:
                 video_title = video_info.get("title", "")
                 video_channel_name = video_info.get("uploader", "")
+                video_view_count = format_view_count(video_info.get("view_count"))
+                video_likes = format_likes(video_info.get("like_count"))
+                video_upload_date = format_upload_date(video_info.get("upload_date", "00000000"))
 
-                video_view_count = video_info.get("view_count")
-                if video_view_count is None:
-                    video_formatted_view_count = "N/A"
-                elif video_view_count >= 1_000_000_000:
-                    video_formatted_view_count = f"{video_view_count / 1_000_000_000:.1f}B"
-                elif video_view_count >= 1_000_000:
-                    video_formatted_view_count = f"{video_view_count / 1_000_000:.1f}M"
-                elif video_view_count >= 1_000:
-                    video_formatted_view_count = f"{video_view_count / 1_000:.1f}K"
-                else:
-                    video_formatted_view_count = str(video_view_count)
-
-                video_likes = video_info.get("like_count")
-                if video_likes is None:
-                    video_formatted_likes = "N/A"
-                elif video_likes >= 1_000_000:
-                    video_formatted_likes = f"{video_likes / 1_000_000:.1f}M"
-                elif video_likes >= 1_000:
-                    video_formatted_likes = f"{video_likes / 1_000:.1f}K"
-                else:
-                    video_formatted_likes = str(video_likes)
-
-                video_upload_date = video_info.get("upload_date", "00000000")
-                video_formatted_upload_date = f"{video_upload_date[:4]}-{video_upload_date[4:6]}-{video_upload_date[6:]}" if len(video_upload_date) == 8 else ""
-
-            frames, frame_count, width, duration, fps, fps_step = extract_frame_rgb_pixels(video_id)
+            frames, frame_count, width, duration, fps, fps_step = extract_frame_hex_pixels(video_id)
             if frames == "":
                 return jsonify({ "result": "end" })
-            return jsonify({ "result": f"{width},{VIDEO_HEIGHT},{duration},{fps},{fps_step},{video_title},{video_channel_name},{video_formatted_view_count},{video_formatted_likes},{video_formatted_upload_date},{frame_count},{frames}" })
-        abort(404)
+            return jsonify({ "result": f"{width}{DELIMITER}{VIDEO_HEIGHT}{DELIMITER}{duration}{DELIMITER}{fps}{DELIMITER}{fps_step}{DELIMITER}{video_title}{DELIMITER}{video_channel_name}{DELIMITER}{video_view_count}{DELIMITER}{video_likes}{DELIMITER}{video_upload_date}{DELIMITER}{frame_count}{DELIMITER}{frames}" })
+        elif data.startswith("search_"):
+            search_query = data[7:]
+            search_result = search_videos(search_query, 3)
+
+            if not "entries" in search_result:
+                return jsonify({ "result": "error" })
+
+            result = ""
+            for _, video_info in enumerate(search_result["entries"], start=1):
+                video_id = video_info.get("id")
+                video_title = video_info.get("title", "")
+                video_description = video_info.get("description", "")
+                video_channel_name = video_info.get("uploader", "")
+                video_view_count = format_view_count(video_info.get("view_count"))
+                video_duration = format_duration(video_info.get("duration"))
+
+                video_thumbnail = extract_thumbnail_hex_pixels(video_id)
+
+                result += f"{video_id}{DELIMITER}{video_title}{DELIMITER}{video_description}{DELIMITER}{video_channel_name}{DELIMITER}{video_view_count}{DELIMITER}{video_duration}{DELIMITER}{video_thumbnail}{DELIMITER}"
+            return jsonify({ "result": result })
+
+        return jsonify({ "result": "error" })
 
 @app.route('/synth', methods=['GET'])
 def routeSynth():
@@ -143,9 +145,67 @@ def routeSynth():
         abort(404)
 
 
-def extract_video_info(video_id):
+def format_view_count(view_count):
+    if view_count is None:
+        formatted_view_count = "N/A"
+    elif view_count >= 1_000_000_000:
+        formatted_view_count = f"{view_count / 1_000_000_000:.1f}B"
+    elif view_count >= 1_000_000:
+        formatted_view_count = f"{view_count / 1_000_000:.1f}M"
+    elif view_count >= 1_000:
+        formatted_view_count = f"{view_count / 1_000:.1f}K"
+    else:
+        formatted_view_count = str(view_count)
+    return formatted_view_count
+
+def format_likes(likes):
+    if likes is None:
+        formatted_likes = "N/A"
+    elif likes >= 1_000_000:
+        formatted_likes = f"{likes / 1_000_000:.1f}M"
+    elif likes >= 1_000:
+        formatted_likes = f"{likes / 1_000:.1f}K"
+    else:
+        formatted_likes = str(likes)
+
+def format_upload_date(upload_date):
+    return f"{upload_date[6:]}.{upload_date[4:6]}.{upload_date[:4]}" if len(upload_date) == 8 else ""
+
+def format_duration(duration):
+    duration = int(duration)
+    hours = duration // 3600
+    minutes = (duration % 3600) // 60
+    seconds = duration % 60
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes}:{seconds:02d}"
+
+
+def search_videos(query, num_results):
+    ytdl_opts = {
+        "quiet": True,
+        "extract_flat": True,
+        "skip_download": True,
+        "extractor_args": {
+            "youtube": ["approximate_date"],
+            "youtubetab": ["approximate_date"],
+        },
+    }
     try:
-        with yt_dlp.YoutubeDL({"quiet": True}) as meta:
+        with yt_dlp.YoutubeDL(ytdl_opts) as meta:
+            results = meta.extract_info(f"ytsearch{num_results}:{query}", download=False)
+    except Exception as e:
+        print(f"Error fetching search results for \"{query}\": {e}")
+
+    return results
+
+def extract_video_info(video_id):
+    ytdl_opts = {
+        "quiet": True,
+        "skip_download": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ytdl_opts) as meta:
             info = meta.extract_info(video_id, download=False)
     except Exception as e:
         print(f"Error fetching metadata for video \"{video_id}\": {e}")
@@ -187,7 +247,29 @@ def download_video(video_id):
     finally:
         active_video_downloads.remove(video_id)
 
-def extract_frame_rgb_pixels(video_id, start_frame=0):
+
+def extract_thumbnail_hex_pixels(video_id):
+    response = requests.get(f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+    response.raise_for_status()
+
+    img = Image.open(io.BytesIO(response.content)).convert("RGB")
+
+    orig_width, orig_height = img.size
+    aspect_ratio = orig_width / orig_height
+    target_width = int(THUMBNAIL_HEIGHT * aspect_ratio)
+    img = img.resize((target_width, THUMBNAIL_HEIGHT), Image.Resampling.LANCZOS)
+
+    frame_raw = img.tobytes()
+    frame_size = len(frame_raw)
+
+    pixels = memoryview(frame_raw)
+    hex_pixels = [
+        f"{pixels[i]:02X}{pixels[i+1]:02X}{pixels[i+2]:02X}"
+        for i in range(0, frame_size, 3)
+    ]
+    return "".join(hex_pixels)
+
+def extract_frame_hex_pixels(video_id, start_frame=0):
     video_path = f"{DOWNLOADS_DIR}/{video_id}_video.mp4"
 
     probe = ffmpeg.probe(video_path)
@@ -237,22 +319,3 @@ def extract_frame_rgb_pixels(video_id, start_frame=0):
 
 if __name__ == '__main__': 
     app.run(host='127.0.0.1', port=80)
-
-
-# def sum_rgb_pixels(path):
-    # img = Image.open(path).convert("RGB")
-
-    # w, h = img.size
-    # width = round(w / h * VIDEO_HEIGHT)
-    # img = img.resize((width, VIDEO_HEIGHT))
-
-    # pixels = list(img.getdata())
-    # hex_pixels = [f"{r:02X}{g:02X}{b:02X}" for (r, g, b) in pixels]
-
-    # grid = [
-        # hex_pixels[i*width:(i+1)*width]
-        # for i in range(VIDEO_HEIGHT)
-    # ]
-    # return "".join(
-        # val for row in grid for val in row
-    # )
