@@ -15,7 +15,7 @@ active_video_downloads = set()
 
 DOWNLOADS_DIR = "dl"
 DELIMITER = "‡"
-THUMBNAIL_HEIGHT = 180
+THUMBNAIL_HEIGHT = 96
 VIDEO_HEIGHT = 54
 VIDEO_MINUTE_LIMIT = 5
 VIDEO_TARGET_FPS = 6
@@ -83,9 +83,9 @@ def routeTranslate():
                 video_view_count = format_view_count(video_info.get("view_count"))
                 video_duration = format_duration(video_info.get("duration"))
 
-                video_thumbnail = extract_thumbnail_hex_pixels(video_id)
+                video_thumbnail, video_thumbnail_width = extract_thumbnail_hex_pixels(video_id)
 
-                result += f"{video_id}{DELIMITER}{video_title}{DELIMITER}{video_description}{DELIMITER}{video_channel_name}{DELIMITER}{video_view_count}{DELIMITER}{video_duration}{DELIMITER}{video_thumbnail}{DELIMITER}"
+                result += f"{video_id}{DELIMITER}{video_title}{DELIMITER}{video_description}{DELIMITER}{video_channel_name}{DELIMITER}{video_view_count}{DELIMITER}{video_duration}{DELIMITER}{video_thumbnail_width}{DELIMITER}{THUMBNAIL_HEIGHT}{DELIMITER}{video_thumbnail}{DELIMITER}"
             return jsonify({ "result": result })
 
         return jsonify({ "result": "error" })
@@ -256,8 +256,8 @@ def extract_thumbnail_hex_pixels(video_id):
 
     orig_width, orig_height = img.size
     aspect_ratio = orig_width / orig_height
-    target_width = int(THUMBNAIL_HEIGHT * aspect_ratio)
-    img = img.resize((target_width, THUMBNAIL_HEIGHT), Image.Resampling.LANCZOS)
+    width = int(THUMBNAIL_HEIGHT * aspect_ratio)
+    img = img.resize((width, THUMBNAIL_HEIGHT), Image.Resampling.LANCZOS)
 
     frame_raw = img.tobytes()
     frame_size = len(frame_raw)
@@ -267,7 +267,7 @@ def extract_thumbnail_hex_pixels(video_id):
         f"{pixels[i]:02X}{pixels[i+1]:02X}{pixels[i+2]:02X}"
         for i in range(0, frame_size, 3)
     ]
-    return "".join(hex_pixels)
+    return "".join(hex_pixels), width
 
 def extract_frame_hex_pixels(video_id, start_frame=0):
     video_path = f"{DOWNLOADS_DIR}/{video_id}_video.mp4"
