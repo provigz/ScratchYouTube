@@ -186,10 +186,6 @@ def search_videos(query, num_results):
         "quiet": True,
         "extract_flat": True,
         "skip_download": True,
-        "extractor_args": {
-            "youtube": ["approximate_date"],
-            "youtubetab": ["approximate_date"],
-        },
     }
     try:
         with yt_dlp.YoutubeDL(ytdl_opts) as meta:

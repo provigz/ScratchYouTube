@@ -1,5 +1,5 @@
 Flask>=3.1.2
 Pillow>=10.0.1
 requests>=2.32.3
-yt-dlp>=2026.3.17
+yt-dlp>=2026.7.04
 ffmpeg-python>=0.2.0
