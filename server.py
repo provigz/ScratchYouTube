@@ -67,9 +67,9 @@ def routeTranslate():
             if frames == "":
                 return jsonify({ "result": "end" })
             return jsonify({ "result": f"{width}{DELIMITER}{VIDEO_HEIGHT}{DELIMITER}{duration}{DELIMITER}{fps}{DELIMITER}{fps_step}{DELIMITER}{video_title}{DELIMITER}{video_channel_name}{DELIMITER}{video_view_count}{DELIMITER}{video_likes}{DELIMITER}{video_upload_date}{DELIMITER}{frame_count}{DELIMITER}{frames}" })
-        elif data.startswith("search_"):
+        elif data.startswith("search_") or data.startswith("popular"):
             search_query = data[7:]
-            search_result = search_videos(search_query, 3)
+            search_result = get_popular_videos(3) if data.startswith("popular") else search_videos(search_query, 3)
 
             if not "entries" in search_result:
                 return jsonify({ "result": "error" })
@@ -180,6 +180,9 @@ def format_duration(duration):
         return f"{hours}:{minutes:02d}:{seconds:02d}"
     return f"{minutes}:{seconds:02d}"
 
+
+def get_popular_videos(num_results):
+    return search_videos(" ", num_results) # Use Space as a query
 
 def search_videos(query, num_results):
     ytdl_opts = {
