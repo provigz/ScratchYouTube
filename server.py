@@ -167,6 +167,7 @@ def format_likes(likes):
         formatted_likes = f"{likes / 1_000:.1f}K"
     else:
         formatted_likes = str(likes)
+    return formatted_likes
 
 def format_upload_date(upload_date):
     return f"{upload_date[6:]}.{upload_date[4:6]}.{upload_date[:4]}" if len(upload_date) == 8 else ""
