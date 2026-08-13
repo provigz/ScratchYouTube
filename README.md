@@ -6,7 +6,11 @@ This project makes it possible to play YouTube videos in vanilla Scratch, which:
 * are in 54p quality;
 * run at around 6FPS.
 
-https://github.com/user-attachments/assets/8ffd3e49-2cf6-4d33-a875-11f966e1da3a
+Popular videos are loaded and displayed when the green flag is pressed.
+
+It is possible to search for videos where the first 3 results are listed.
+
+https://github.com/user-attachments/assets/f994a9b0-13b7-4c43-8993-121a59430684
 
 ## Explanation on Scratch HTTP GET requests
 
@@ -21,7 +25,7 @@ This project takes advantage of those blocks, essentially modifying the requests
 
 ## Featuring
 
-* A **Python server**, which can download videos and accepts requests for video frames and audio, compatible with Scratch.
+* A **Python server**, which can download videos and accepts requests for video frames, audio, search and popular videos, compatible with Scratch.
 * A **Scratch project**, which uses translation and synth blocks to make requests to the custom server.
 * A **Tampermonkey userscript**, which applies the hack that makes Scratch translation and synth blocks make requests to the custom server, instead of Scratch's actual servers.
 Currently directs to "localhost". Can also be copied over directly into the JS console.
@@ -52,6 +56,6 @@ On Windows, make sure its location is added to the `PATH` environment variable, 
 2. Ensure you have Python and `pip` installed. Install [all required libraries](#requirements-for-python-server) and run `server.py` afterwards.
 3. Install the Tampermonkey extension in your browser and create a new userscript, where you paste in the contents of `scratch_userscript.user.js`.
 Alternatively, run the code found in `scratch_userscript.user.js` inside the JS console at the Scratch editor.
-4. Import `scratch_project.json` into the Scratch editor and press the green flag.
+4. Import `scratch_project.sb3` into the Scratch editor and press the green flag.
 
-If everything is set up and working correctly, in Scratch you should be prompted to enter a video ID for the server to process, and afterwards for Scratch to play!
+If everything is set up and working correctly, popular videos relative to your region should be loaded!
