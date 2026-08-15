@@ -45,7 +45,11 @@ def routeTranslate():
             if not os.path.isfile(f"{DOWNLOADS_DIR}/{video_id}_video.mp4"):
                 return jsonify({ "result": "error" })
 
-            frames, frame_count, width, duration, fps, fps_step = extract_frame_hex_pixels(video_id, video_start_frame - 1)
+            try:
+                frames, frame_count, width, duration, fps, fps_step = extract_frame_hex_pixels(video_id, video_start_frame - 1)
+            except Exception as e:
+                print(e)
+                return jsonify({ "result": "error" })
             if frames == "":
                 return jsonify({ "result": "end" })
             return jsonify({ "result": f"{frame_count}{DELIMITER}{frames}" })
@@ -53,7 +57,12 @@ def routeTranslate():
             video_id = data[4:]
             if video_id in active_video_downloads:
                 return jsonify({ "result": "processing" })
-            download_video(video_id)
+            elif not os.path.isfile(f"{DOWNLOADS_DIR}/{video_id}_video.mp4"):
+                try:
+                    download_video(video_id)
+                except Exception as e:
+                    print(e)
+                    return jsonify({ "result": "error" })
 
             video_info = extract_video_info(video_id)
             if video_info:
@@ -63,7 +72,11 @@ def routeTranslate():
                 video_likes = format_likes(video_info.get("like_count"))
                 video_upload_date = format_upload_date(video_info.get("upload_date", "00000000"))
 
-            frames, frame_count, width, duration, fps, fps_step = extract_frame_hex_pixels(video_id)
+            try:
+                frames, frame_count, width, duration, fps, fps_step = extract_frame_hex_pixels(video_id)
+            except Exception as e:
+                print(e)
+                return jsonify({ "result": "error" })
             if frames == "":
                 return jsonify({ "result": "end" })
             return jsonify({ "result": f"{width}{DELIMITER}{VIDEO_HEIGHT}{DELIMITER}{duration}{DELIMITER}{fps}{DELIMITER}{fps_step}{DELIMITER}{video_title}{DELIMITER}{video_channel_name}{DELIMITER}{video_view_count}{DELIMITER}{video_likes}{DELIMITER}{video_upload_date}{DELIMITER}{frame_count}{DELIMITER}{frames}" })
